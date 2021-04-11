@@ -11,7 +11,7 @@ namespace Car.CarController
         private float CurrentRotation { get; set; } = 0;
         private void Start()
         {
-            Manager.OnInputChangedWheels += OnInputChangedWheels;
+            //Manager.OnInputChangedWheels += OnInputChangedWheels;
         }
 
 
@@ -22,7 +22,7 @@ namespace Car.CarController
                 this.transform.Rotate(new Vector3(10, 0, 0));
                 this.transform.localRotation = Quaternion.Euler(this.transform.localRotation.x, 0, this.transform.localRotation.z);
             }
-
+            //this.transform.Rotate()
             CurrentRotation = Input.GetAxisRaw("Horizontal") * RotationSpeed * Time.deltaTime;
 
             if (CurrentRotation <= MaximumRotation || CurrentRotation >= -MaximumRotation)

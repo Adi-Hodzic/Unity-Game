@@ -20,7 +20,6 @@ namespace Player.CarController
                 Debug.LogError("Please add waypoints in the editor");
                 UnityEditor.EditorApplication.isPlaying = false;
             }
-
             NextWaypoint = Waypoints[0];
         }
 

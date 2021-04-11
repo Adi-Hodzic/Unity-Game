@@ -8,12 +8,8 @@ namespace Car.CameraController
         [SerializeField] private GameObject obj;
         [SerializeField] private Car.InputManagement.InputManagement Manager;
 
-        private Vector3 FirstPosition;
-        private Vector3 FirstRotation;
         void Start()
         {
-            FirstPosition = obj.transform.position;
-            FirstRotation = obj.transform.rotation.eulerAngles;
             Manager.OnRotate += OnRotate;
         }
 
