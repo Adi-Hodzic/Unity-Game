@@ -24,7 +24,7 @@ namespace Osiris.CarController
         private int Indexer = 0;
         private void Update()
         {
-            this.transform.position = Vector3.MoveTowards(this.transform.position, NextWaypoint.transform.position, 2 * Time.deltaTime);
+            this.transform.position = Vector3.MoveTowards(this.transform.position, NextWaypoint.transform.position, 10 * Time.deltaTime);
             this.transform.LookAt(NextWaypoint.transform);
 
             if (Vector3.Distance(this.transform.position, NextWaypoint.transform.position) <= 1)

@@ -6,16 +6,19 @@ namespace Osiris.CarController
 {
     public class Nav : MonoBehaviour
     {
-        private NavMeshAgent navAgent;
+        private NavMeshAgent navMeshAgent;
         [SerializeField] private GameObject cars;
         void Start()
         {
-            navAgent = GetComponent<NavMeshAgent>();
+            navMeshAgent = GetComponent<NavMeshAgent>();
+            navMeshAgent.updateRotation = false;
+
         }
 
         void Update()
         {
-            navAgent.SetDestination(cars.transform.position);
+            navMeshAgent.SetDestination(cars.transform.position);
+            transform.LookAt(cars.transform.position);
         }
     }
 }
