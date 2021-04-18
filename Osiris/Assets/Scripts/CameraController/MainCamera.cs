@@ -1,10 +1,12 @@
-﻿using UnityEngine;
+﻿using Osiris.Controllers.Core;
+using UnityEngine;
+
 namespace Osiris.CameraController
 {
     public class MainCamera : MonoBehaviour
     {
         [SerializeField] private GameObject obj;
-        [SerializeField] private InputManagement.InputManagement Manager;
+        [SerializeField] private InputManagement Manager;
 
         void Start()
         {
