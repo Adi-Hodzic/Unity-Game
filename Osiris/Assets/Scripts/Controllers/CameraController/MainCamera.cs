@@ -5,8 +5,11 @@ namespace Osiris.CameraController
 {
     public class MainCamera : MonoBehaviour
     {
-        [SerializeField] private GameObject obj;
-        [SerializeField] private InputManagement Manager;
+        [SerializeField]
+        private GameObject obj;
+
+        [SerializeField] 
+        private InputManagement Manager;
 
         void Start()
         {
