@@ -9,26 +9,26 @@ namespace Osiris.Controllers.CarController
         [SerializeField] [ReorderableList] private List<GameObject> Wheels;
         [SerializeField] [Range(0.001f, 100)] private float MaxSpeedT;
         [SerializeField] [Range(0.001f, 20)] private float MaxSpeedR;
-        [SerializeField] [Range(0.001f, 100)] private float TurnSpeed;
-        [SerializeField] private Transform CenterOfMass;
+        //[SerializeField] [Range(0.001f, 100)] 
+        private float TurnSpeed;
         [SerializeField] private LayerMask GroundLayer;
         [SerializeField] private InputManagement Manager;
         [SerializeField] private float MaximumRotation;
         [SerializeField] private float RotationSpeed;
-
+        [SerializeField] private GameObject Mass;
+        private Rigidbody CarRigidbody;
         private float CurrentRotation { get; set; }
         private float CurrentSpeed { get; set; }
         private float Last { get; set; }
-        private Rigidbody Rigidbody;
-        //private bool IsCarGrounded;
-
+        private bool IsCarGroundedRearWheels { get; set; }
+        private bool IsCarGroundedFrontWheels { get; set; }
+        private float DistToGround { get; set; }
         void Start()
         {
             Manager.OnInputChanged += OnInputChanged;
             Manager.OnBrake += OnBrake;
-            Rigidbody = GetComponent<Rigidbody>();
-            Rigidbody.centerOfMass = CenterOfMass.localPosition;
-            this.transform.position = Rigidbody.position;
+            CarRigidbody = GetComponent<Rigidbody>();
+            DistToGround = transform.position.y + 1f;
         }
 
         private void OnBrake()
@@ -38,11 +38,31 @@ namespace Osiris.Controllers.CarController
         }
         private void OnInputChanged(float Horizontal, float Vertical)
         {
+            if (MaxSpeedT - CurrentSpeed < 25)
+                TurnSpeed = 25;
+            else
+                TurnSpeed = MaxSpeedT - CurrentSpeed;
+            float NewChange = 0;
+            //Last
             if (Vertical != 0)
                 Last = Vertical;
-            
+            if (Vertical > 0)
+                NewChange = Vertical;
+            //IsCarGrounded
+            IsCarGroundedRearWheels =
+                        Physics.Raycast(Wheels[2].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer) ||
+                        Physics.Raycast(Wheels[3].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer);
+            IsCarGroundedFrontWheels =
+                        Physics.Raycast(Wheels[4].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer) ||
+                        Physics.Raycast(Wheels[5].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer);
 
-            if (Vertical > 0 || Vertical < 0)
+            if (!IsCarGroundedRearWheels && IsCarGroundedFrontWheels)
+                CarRigidbody.MovePosition(Mass.transform.position);
+            else
+                CarRigidbody.MovePosition(this.transform.position);
+
+
+            if ((Vertical > 0 || Vertical < 0) && IsCarGroundedRearWheels && IsCarGroundedFrontWheels)
             {
                 //Forward
                 if (Vertical > 0)
@@ -54,6 +74,10 @@ namespace Osiris.Controllers.CarController
                 //Back
                 else if (Vertical < 0 && CurrentSpeed < MaxSpeedR)
                 {
+                    if (NewChange > 0)
+                        while (CurrentSpeed <= 0)
+                            CurrentSpeed -= 0.001f;
+
                     if (CurrentSpeed < MaxSpeedR)
                         CurrentSpeed += 0.5f;
                     this.transform.Translate(Vector3.forward * Time.deltaTime * CurrentSpeed * Vertical);
@@ -64,7 +88,7 @@ namespace Osiris.Controllers.CarController
                 //Limit
                 else if (CurrentSpeed == MaxSpeedR || CurrentSpeed == MaxSpeedT)
                     this.transform.Translate(Vector3.forward * Time.deltaTime * CurrentSpeed * Vertical);
-                //Rotation
+                //CarRotation
                 if (Horizontal != 0 && Vertical > 0)
                     this.transform.Rotate(Vector3.up, TurnSpeed * Time.deltaTime * Horizontal);
                 else if (Vertical < 0 && Horizontal != 0)
@@ -78,33 +102,53 @@ namespace Osiris.Controllers.CarController
                     {
                         CurrentSpeed -= 0.2f;
                         this.transform.Translate(Vector3.forward * Time.deltaTime * CurrentSpeed);
-                        this.transform.Rotate(Vector3.up, CurrentSpeed * Time.deltaTime * Horizontal);
+                        if (IsCarGroundedRearWheels)
+                            this.transform.Rotate(Vector3.up, CurrentSpeed * Time.deltaTime * Horizontal);
                     }
                     if (Last < 0)
                     {
                         CurrentSpeed -= 0.1f;
                         this.transform.Translate(Vector3.forward * Time.deltaTime * -CurrentSpeed);
-                        this.transform.Rotate(Vector3.up, CurrentSpeed * Time.deltaTime * -Horizontal);
+                        if (IsCarGroundedRearWheels)
+                            this.transform.Rotate(Vector3.up, CurrentSpeed * Time.deltaTime * -Horizontal);
                     }
                 }
             }
-
+            float NewRotation = RotationSpeed;
+            if (TurnSpeed == 25)
+                NewRotation = 4 + RotationSpeed / 2;
             //Rotation - WHEELS
-            CurrentRotation = Horizontal * RotationSpeed * Time.deltaTime;
-            if (CurrentRotation <= MaximumRotation || CurrentRotation >= -MaximumRotation)
-            {
-                Vector3 from_v = new Vector3(Wheels[0].transform.rotation.x, Wheels[0].transform.localRotation.y, Wheels[0].transform.localRotation.z);
-                Vector3 to_v = new Vector3(Wheels[1].transform.rotation.x, CurrentRotation, Wheels[1].transform.localRotation.z);
-                Quaternion from = Quaternion.Euler(from_v);
-                Quaternion to = Quaternion.Euler(to_v);
-                Wheels[0].transform.localRotation = Quaternion.Lerp(from, to, 1f);
-                Wheels[1].transform.localRotation = Quaternion.Lerp(from, to, 1f);
-            }
+            CurrentRotation = Horizontal * NewRotation * Time.deltaTime;
+            Wheels[4].transform.localRotation = Quaternion.Slerp(
+                                                           /*1*/Wheels[4].transform.localRotation,
+                                                           /*2*/new Quaternion(Wheels[4].transform.localRotation.x,
+                                                           /*2*/Mathf.Clamp(CurrentRotation, -MaximumRotation, MaximumRotation),
+                                                           /*2*/Wheels[4].transform.localRotation.z,
+                                                           /*2*/Wheels[4].transform.localRotation.w),
+                                                           /*3*/NewRotation * Time.deltaTime * 0.5f);
+            Wheels[5].transform.localRotation = Quaternion.Slerp(
+                                                           /*1*/Wheels[5].transform.localRotation,
+                                                           /*2*/new Quaternion(Wheels[5].transform.localRotation.x,
+                                                           /*2*/Mathf.Clamp(CurrentRotation, -MaximumRotation, MaximumRotation),
+                                                           /*2*/Wheels[5].transform.localRotation.z,
+                                                           /*2*/Wheels[4].transform.localRotation.w),
+                                                           /*3*/NewRotation * Time.deltaTime * 0.5f);
+
             //Speed-wheels
             int NegOrPos = 1;
             if (Last < 0) NegOrPos = -1;
-            foreach (GameObject i in Wheels)
-                i.transform.Rotate(NegOrPos * CurrentSpeed, i.transform.localRotation.y, i.transform.localRotation.z);
+            if (!IsCarGroundedRearWheels && (Vertical > 0 || Vertical < 0))
+            {
+                Wheels[2].transform.Rotate(new Vector3(NegOrPos * 5, 0, 0));
+                Wheels[3].transform.Rotate(new Vector3(NegOrPos * 5, 0, 0));
+            }
+            for (int i = 0; i < Wheels.Count - 2; i++)
+            {
+                GameObject g = Wheels[i];
+                g.transform.Rotate(NegOrPos * CurrentSpeed, g.transform.localRotation.y, 0);
+            }
         }
+
     }
 }
+

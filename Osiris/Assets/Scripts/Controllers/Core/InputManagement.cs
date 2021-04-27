@@ -19,6 +19,5 @@ namespace Osiris.Controllers.Core
             if (Input.GetKey(keyN2))
                 OnBrake?.Invoke();
         }
-
     }
 }
