@@ -9,26 +9,25 @@ namespace Osiris.Controllers.CarController
         [SerializeField] [ReorderableList] private List<GameObject> Wheels;
         [SerializeField] [Range(0.001f, 100)] private float MaxSpeedT;
         [SerializeField] [Range(0.001f, 20)] private float MaxSpeedR;
-        //[SerializeField] [Range(0.001f, 100)] 
-        private float TurnSpeed;
+        [SerializeField] [Range(0.001f,1)] private float MaxDistanceFromTheGround;
         [SerializeField] private LayerMask GroundLayer;
         [SerializeField] private InputManagement Manager;
+        [SerializeField] private GameObject Mass;
         [SerializeField] private float MaximumRotation;
         [SerializeField] private float RotationSpeed;
-        [SerializeField] private GameObject Mass;
+        [SerializeField] private int Y;
         private Rigidbody CarRigidbody;
+        private float TurnSpeed;
         private float CurrentRotation { get; set; }
         private float CurrentSpeed { get; set; }
         private float Last { get; set; }
         private bool IsCarGroundedRearWheels { get; set; }
         private bool IsCarGroundedFrontWheels { get; set; }
-        private float DistToGround { get; set; }
         void Start()
         {
             Manager.OnInputChanged += OnInputChanged;
             Manager.OnBrake += OnBrake;
             CarRigidbody = GetComponent<Rigidbody>();
-            DistToGround = transform.position.y + 1f;
         }
 
         private void OnBrake()
@@ -36,33 +35,48 @@ namespace Osiris.Controllers.CarController
             if (CurrentSpeed > 0) CurrentSpeed -= 1.5f;
             if (CurrentSpeed < 0) CurrentSpeed = 0;
         }
+        private bool IsGroundedRearWheels()
+        {
+            return Physics.Raycast(Wheels[2].transform.position, transform.TransformDirection(Vector3.down), out _, MaxDistanceFromTheGround, GroundLayer) ||
+                        Physics.Raycast(Wheels[3].transform.position, transform.TransformDirection(Vector3.down), out _, MaxDistanceFromTheGround, GroundLayer);
+        }
+        private bool IsGroundedFrontWheels()
+        {
+            return Physics.Raycast(Wheels[4].transform.position, transform.TransformDirection(Vector3.down), out _, MaxDistanceFromTheGround, GroundLayer) ||
+                        Physics.Raycast(Wheels[5].transform.position, transform.TransformDirection(Vector3.down), out _, MaxDistanceFromTheGround, GroundLayer);
+        }
         private void OnInputChanged(float Horizontal, float Vertical)
         {
+            if (this.gameObject.transform.position.y < Y)
+                this.gameObject.SetActive(false);
+            //IsCarGrounded
+            IsCarGroundedRearWheels = IsGroundedRearWheels();
+            IsCarGroundedFrontWheels = IsGroundedFrontWheels();
+
             if (MaxSpeedT - CurrentSpeed < 25)
                 TurnSpeed = 25;
             else
                 TurnSpeed = MaxSpeedT - CurrentSpeed;
-            float NewChange = 0;
-            //Last
-            if (Vertical != 0)
-                Last = Vertical;
-            if (Vertical > 0)
-                NewChange = Vertical;
-            //IsCarGrounded
-            IsCarGroundedRearWheels =
-                        Physics.Raycast(Wheels[2].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer) ||
-                        Physics.Raycast(Wheels[3].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer);
-            IsCarGroundedFrontWheels =
-                        Physics.Raycast(Wheels[4].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer) ||
-                        Physics.Raycast(Wheels[5].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer);
 
+            //Last
+            float NewChange = 0;
+            if (IsCarGroundedRearWheels && IsCarGroundedFrontWheels)
+            {
+                if (Vertical != 0)
+                    Last = Vertical;
+                if (Vertical > 0)
+                    NewChange = Vertical;
+            }
+
+
+            //Balance
             if (!IsCarGroundedRearWheels && IsCarGroundedFrontWheels)
                 CarRigidbody.MovePosition(Mass.transform.position);
             else
                 CarRigidbody.MovePosition(this.transform.position);
 
 
-            if ((Vertical > 0 || Vertical < 0) && IsCarGroundedRearWheels && IsCarGroundedFrontWheels)
+            if (IsCarGroundedRearWheels && IsCarGroundedFrontWheels && (Vertical > 0 || Vertical < 0))
             {
                 //Forward
                 if (Vertical > 0)
@@ -72,7 +86,7 @@ namespace Osiris.Controllers.CarController
                     this.transform.Translate(Vector3.forward * Time.deltaTime * CurrentSpeed * Vertical);
                 }
                 //Back
-                else if (Vertical < 0 && CurrentSpeed < MaxSpeedR)
+                else if (Vertical < 0 && CurrentSpeed < MaxSpeedR + 1)
                 {
                     if (NewChange > 0)
                         while (CurrentSpeed <= 0)

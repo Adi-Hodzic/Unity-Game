@@ -14,29 +14,76 @@ namespace Osiris.Controllers.CarController
         [SerializeField] private LayerMask GroundLayer;
         [SerializeField] private GameObject MassFront;
         [SerializeField] private GameObject MassRear;
+        [SerializeField] private float Y;
         private NavMeshAgent NavAgent;
         private NavMeshPath Path { get; set; }
         private Rigidbody BotRigidbody;
         private MeshCollider Mesh;
-        public GameObject Target;
+        public GameObject Target { get; set; }
         private Vector3 Current { get; set; }
         private Vector3 LastRotation { get; set; }
         private Vector3 NextRotation { get; set; }
-        private bool Ine = false;
-        private bool IsCarGroundedRearWheels;
-        private bool IsCarGroundedFrontWheels;
-
-        private int NumberOfBots = 4;
-
+        private bool Ine { get; set; }
+        private bool IsCarGroundedRearWheels { get; set; }
+        private bool IsCarGroundedFrontWheels { get; set; }
+        private bool IsColissionDetected { get; set; }
+        public bool Go { get; set; }
         void Start()
         {
+            Go = true;
+            Ine = false;
+            Physics.IgnoreLayerCollision(8, 9);
             NavAgent = GetComponent<NavMeshAgent>();
             BotRigidbody = GetComponent<Rigidbody>();
             Mesh = GetComponent<MeshCollider>();
         }
-
+        private void FindNewTarget()
+        {
+            List<GameObject> Enemies = new List<GameObject>();
+            Enemies.AddRange(GameObject.FindGameObjectsWithTag("Bot"));
+            string thisName = this.gameObject.name;
+            bool p = false;
+            while (p == false)
+            {
+                int random = Random.Range(0, Enemies.Count);
+                if (string.Compare(thisName, Enemies[random].name) != 0)
+                {
+                    p = true;
+                    Target = Enemies[random];
+                }
+            }
+        }
+        private bool MTargets()
+        {
+            List<GameObject> Enemies = new List<GameObject>();
+            Enemies.AddRange(GameObject.FindGameObjectsWithTag("Bot"));
+            if (Enemies.Count > 1)
+                return true;
+            return false;
+        }
         private void Update()
         {
+            if (!MTargets() && GameObject.FindGameObjectWithTag("Player").activeSelf)
+                Target = GameObject.FindGameObjectWithTag("Player");
+            else if (!GameObject.FindGameObjectWithTag("Player").activeSelf)
+                this.gameObject.GetComponent<NavMeshAgent>().enabled = false;
+            if (!Target.activeInHierarchy)
+                FindNewTarget();
+            if (this.transform.position.y <= Y)
+                gameObject.SetActive(false);
+        }
+        private void FixedUpdate()
+        {
+            if (IsColissionDetected) 
+                StartCoroutine(WakeUp());
+            else 
+                AssistFixedUpdate();
+
+            IsColissionDetected = false;
+        }
+        private void AssistFixedUpdate()
+        {
+
             if (NavAgent.isOnNavMesh)
                 NavAgent.enabled = true;
             else
@@ -44,20 +91,27 @@ namespace Osiris.Controllers.CarController
 
             if (NavAgent.enabled == true)
             {
+                Mesh.enabled = false;
                 Path = NavAgent.path;
                 NavAgent.SetDestination(Target.transform.position);
                 StartCoroutine(StartCoroutine());
             }
             else if (NavAgent.enabled == false && IsCarGrounded())
             {
-                Mesh.enabled = false;
                 NavAgent.enabled = true;
+                Mesh.enabled = false;
             }
+            else if (NavAgent.enabled == false)
+                Mesh.enabled = true;
             else if (!IsCarGrounded())
                 Balance();
-
         }
-
+        IEnumerator WakeUp()
+        {
+            yield return new WaitForSeconds(2f);
+            Physics.IgnoreLayerCollision(8, 9);
+            AssistFixedUpdate();
+        }
         private bool IsRearWheelsGrounded()
         {
             IsCarGroundedRearWheels =
@@ -80,11 +134,7 @@ namespace Osiris.Controllers.CarController
         }
         private void Balance()
         {
-            if (!IsCarGrounded())
-                Mesh.enabled = true;
-            else
-                Mesh.enabled = false;
-
+            Mesh.enabled = true;
             if (!IsFrontWheelsGrounded() && IsRearWheelsGrounded())
             {
                 NavAgent.enabled = false;
@@ -99,31 +149,26 @@ namespace Osiris.Controllers.CarController
         private void ChangeRotation(float y)
         {
             Wheels[4].transform.localRotation = Quaternion.Slerp(
-                                                           /*1*/Wheels[4].transform.localRotation,
-                                                           /*2*/new Quaternion(Wheels[4].transform.localRotation.x,
-                                                           /*2*/Mathf.Clamp(y, -10, 10) * Time.deltaTime,
-                                                           /*2*/Wheels[4].transform.localRotation.z,
-                                                           /*2*/Wheels[4].transform.localRotation.w),
-                                                           /*3*/2 * Time.deltaTime * 0.5f);
+                                                           Wheels[4].transform.localRotation,
+                                                           new Quaternion(Wheels[4].transform.localRotation.x,
+                                                           Mathf.Clamp(y, -10, 10) * Time.deltaTime,
+                                                           Wheels[4].transform.localRotation.z,
+                                                           Wheels[4].transform.localRotation.w),
+                                                           2 * Time.deltaTime * 0.5f);
             Wheels[5].transform.localRotation = Quaternion.Slerp(
-                                                           /*1*/Wheels[5].transform.localRotation,
-                                                           /*2*/new Quaternion(Wheels[5].transform.localRotation.x,
-                                                           /*2*/Mathf.Clamp(y, -10, 10) * Time.deltaTime,
-                                                           /*2*/Wheels[5].transform.localRotation.z,
-                                                           /*2*/Wheels[5].transform.localRotation.w),
-                                                           /*3*/2 * Time.deltaTime * 0.5f);
+                                                           Wheels[5].transform.localRotation,
+                                                           new Quaternion(Wheels[5].transform.localRotation.x,
+                                                           Mathf.Clamp(y, -10, 10) * Time.deltaTime,
+                                                           Wheels[5].transform.localRotation.z,
+                                                           Wheels[5].transform.localRotation.w),
+                                                           2 * Time.deltaTime * 0.5f);
         }
-        private void OnCollisionEnter(Collision collision)
+        private void OnCollisionStay(Collision collision)
         {
-            for (int i = 0; i < NumberOfBots; i++)
-            {
-                if (collision.gameObject.name == $"Bot" + i + "(Clone)")
-                {
-                    Mesh.enabled = true;
-                    NavAgent.enabled = false;
-                }
-                Debug.Log("Udar");
-            }
+            NavAgent.enabled = false;
+            Mesh.enabled = true;
+            Physics.IgnoreLayerCollision(8, 9, false);
+            IsColissionDetected = true;
         }
         IEnumerator StartCoroutine()
         {
@@ -180,13 +225,6 @@ namespace Osiris.Controllers.CarController
                         NavAgent.speed = MaxSpeed - 1;
                 }
             }
-        }
-        private bool isAnyWheelGrounded()
-        {
-            return Physics.Raycast(Wheels[2].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer) ||
-                    Physics.Raycast(Wheels[3].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer) ||
-                    Physics.Raycast(Wheels[4].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer) ||
-                    Physics.Raycast(Wheels[5].transform.position, transform.TransformDirection(Vector3.down), out _, 0.69f, GroundLayer);
         }
     }
 }
